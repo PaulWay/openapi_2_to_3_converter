@@ -194,6 +194,11 @@ def convert_schema(api, verbose=False, request=None):
 
     return api
 
+# file suffix -> read(handle) function, write(data, handle) function
+format_functions = {
+    '.json': {'load': json.load, 'dump': json.dump},
+    '.yaml': {'load': yaml.full_load, 'dump': yaml.dump},
+}
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -217,18 +222,18 @@ if __name__ == '__main__':
         print(f"ERROR: {args.input_file} not found")
         exit(1)
     for param, fname in (('input', args.input_file,), ('output', args.output_file,)):
-        if not (fname.endswith('.json') or fname.endswith('.yaml')):
+        for ext, format_function in format_functions.items()
+            if fname.endswith(ext):
+                break
+        else:
             print(f"ERROR: I don't know how to decode {param} file '{fname}'")
-            print("I recognise JSON or YAML formats")
+            print(f"I recognise these extensions: {', '.join(sorted(formatters.keys()))}")
             exit(1)
 
     # Load version 2
 
     ifh = open(args.input_file, 'r')
-    if args.input_file.endswith('.json'):
-        api = json.load(ifh)
-    else:
-        api = yaml.full_load(ifh)
+    api = format_function['load'](ifh)
 
     # Convert schema
 
@@ -237,7 +242,4 @@ if __name__ == '__main__':
     # Save version 3
 
     ofh = open(args.output_file, 'w')
-    if args.output_file.endswith('.json'):
-        json.dump(api3, ofh)
-    else:
-        yaml.dump(api3, ofh)
+    format_function['dump'](api3, ofh)
