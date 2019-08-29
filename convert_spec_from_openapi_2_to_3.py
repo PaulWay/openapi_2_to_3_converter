@@ -54,10 +54,6 @@ def convert_parameter(param, verbose):
         convert_definition_path(param['schema'])
         if 'items' in param['schema']:
             convert_definition_path(param['schema']['items'])
-    if 'in' in param and param['in'] not in ('query', 'header', 'path', 'cookie'):
-        if verbose:
-            print(f"!!! param {param['name']} in {param['in']}, changed to 'query'")
-        param['in'] = 'query'
     if 'type' in param:
         if 'schema' not in param:
             param['schema'] = {}
@@ -80,12 +76,46 @@ def convert_parameter(param, verbose):
             if verbose:
                 print(f"!!! Discarding aliases {param['aliases']} for {param['name']}")
             del(param['aliases'])
+    if 'in' in param and param['in'] not in ('query', 'header', 'path', 'cookie'):
+        if param['in'] == 'body':
+            # Has to be handled in convert_parameters (below) so this key
+            # can be moved into a requestBody.
+            pass
+        else:
+            print(f"!!! Cannot convert parameter in '{param['in']}' - setting to 'query'")
+            param['in'] = 'query'
 
 
 def convert_parameters(item, verbose):
     if 'parameters' in item:
         for param in item['parameters']:
             convert_parameter(param, verbose)
+            # Move body parameters into a requestBody object.  There should
+            # only ever be one requestBody - if here
+            if 'in' in param and param['in'] == 'body':
+                if verbose:
+                    print(f"... converting body parameter to requestBody")
+                if 'requestBody' in item:
+                    print(
+                        f"!!! parameter {param['name']} is a body parameter,"
+                        "but there's already a body parameter in its container"
+                    )
+                    # Discard it here
+                else:
+                    # Create a new requestBody in the item
+                    item['requestBody'] = {
+                        'required': param['required'] if 'required' in param else False,
+                        'description': param['description'] if 'description' in param else '',
+                        'content': {
+                            # What content types can we accept?
+                            'application/json': {
+                                # Other things?
+                                'schema': param['schema']
+                            }
+                        }
+                    }
+                    # Remove the parameter from the item's parameter list
+                    item['parameters'].remove(param)
 
 
 def convert_responses(item, verbose, produces_list):
